@@ -264,8 +264,26 @@ void hidl_string::setToExternal(const char *data, size_t size) {
     // have a zero byte there because the remote process will have a pointer
     // directly into the read-only binder buffer. If we manually copy the
     // data now to add a zero, then we lose the efficiency of this method.
-    // Checking here (it's also checked in the parceling code later).
-    CHECK(data[size] == '\0');
+    // Blobs built against an older ABI can pass a buffer without that
+    // terminator; those take an owned, terminated copy instead. The copy is
+    // made before clear() so that data may alias this string's own buffer.
+    if (data[size] != '\0') {
+        char *buf = static_cast<char *>(malloc(size + 1));
+        if (buf == nullptr) {
+            LOG(FATAL) << "failed to allocate " << (size + 1) << " bytes for hidl_string";
+        }
+        memcpy(buf, data, size);
+        buf[size] = '\0';
+        LOG(WARNING) << "hidl_string::setToExternal: copied " << size
+                     << " bytes to add the missing zero terminator";
+
+        clear();
+
+        mBuffer = buf;
+        mSize = static_cast<uint32_t>(size);
+        mOwnsBuffer = true;
+        return;
+    }
 
     clear();
 
