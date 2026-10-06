@@ -268,6 +268,9 @@ void hidl_string::setToExternal(const char *data, size_t size) {
     // terminator; those take an owned, terminated copy instead. The copy is
     // made before clear() so that data may alias this string's own buffer.
     if (data[size] != '\0') {
+        if (size >= UINT32_MAX) {
+            LOG(FATAL) << "string size can't exceed 2^32 bytes: " << size;
+        }
         char *buf = static_cast<char *>(malloc(size + 1));
         if (buf == nullptr) {
             LOG(FATAL) << "failed to allocate " << (size + 1) << " bytes for hidl_string";
